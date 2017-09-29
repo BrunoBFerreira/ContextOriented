@@ -1,37 +1,53 @@
 from khepri.autocad import *
 from contextpy import *
 
-my3Dlayer = layer("3D")
-my2Dlayer = layer("2D")
+my3DLayer = layer("3D")
+my2DLayer = layer("2D")
 myAnalysisLayer = layer("analysis")
 
+def rotated_v(v, alpha):
+    return vpol(pol_rho(v), pol_phi(v) + alpha)
+
 class Wall:
-    def __init__(self, p1, lenght, width, height):
+    def __init__(self, p1, p2, width, height):
         self.p1 = p1
-        self.length = lenght
+        self.p2 = p2
         self.width = width
         self.height = height
+        self.result = empty_shape()
 
     def generate(self):
-        return box(self.p1, self.length, self.width, self.height)
+        v0 = self.p2 - self.p1
+        v1 = rotated_v(v0, pi/2)
+        c = loc_from_o_vx_vy(self.p1, v0, v1)
+        self.result = box(c-vy(self.width/2, c.cs), distance(self.p1, self.p2), self.width, self.height)
+        return self.result
 
-    @around(my3Dlayer)
+    @around(my3DLayer)
     def generate(self):
-        return box(self.p1, self.length, self.width, self.height)
+        v0 = self.p2 - self.p1
+        v1 = rotated_v(v0, pi / 2)
+        c = loc_from_o_vx_vy(self.p1, v0, v1)
+        self.result = box(c - vy(self.width / 2, c.cs), distance(self.p1, self.p2), self.width, self.height)
+        return self.result
 
-    @around(my2Dlayer)
+    @around(my2DLayer)
     def generate(self):
-        p2 = self.p1 + vx(self.length)
-        p3 = p2 + vy(self.width)
-        p4 = self.p1 + vy(self.width)
-        return line(self.p1, p2, p3, p4, self.p1)
+        v0 = self.p2 - self.p1
+        v1 = rotated_v(v0, pi / 2)
+        c = loc_from_o_vx_vy(self.p1, v0, v1)
+        self.result = rectangle(c - vy(self.width / 2, c.cs), distance(self.p1, self.p2), self.width)
+        return self.result
 
     @around(myAnalysisLayer)
     def generate(self):
-        p2 = self.p1 + vx(self.length)
+        v0 = self.p2 - self.p1
+        v1 = rotated_v(v0, pi / 2)
+        c = loc_from_o_vx_vy(self.p1, v0, v1)
+        p2 = c + vx(distance(self.p1, self.p2), c.cs)
         p3 = p2 + vz(self.height)
-        p4 = self.p1 + vz(self.height)
-        return surface_from(line(self.p1, p2, p3, p4, self.p1))
+        p4 = p3 - vx(distance(self.p1, self.p2), c.cs)
+        return surface_from(line(c, p2, p3, p4, c))
 
 class Slab:
     def __init__(self, path, thickness):
@@ -41,11 +57,11 @@ class Slab:
     def generate(self):
         return extrusion(surface_from(self.path), self.thickness)
 
-    @around(my3Dlayer)
+    @around(my3DLayer)
     def generate(self):
         return extrusion(surface_from(self.path), self.thickness)
 
-    @around(my2Dlayer)
+    @around(my2DLayer)
     def generate(self):
         return self.path
 
@@ -54,37 +70,57 @@ class Slab:
         return surface_from(self.path)
 
 class Door:
-    def __init__(self, w, pos1, pos2):
-        self.pos1 = pos1
-        self.pos2 = pos2
+    def __init__(self, w, p1, p2, h):
+        self.p1 = p1
+        self.p2 = p2
+        self.height = h
         self.w = w
 
     def generate(self):
-        return subtraction(self.w, box(self.pos1, self.pos2))
-
-    @around(my3Dlayer)
+        v0 = self.p2 - self.p1
+        v1 = rotated_v(v0, pi / 2)
+        c = loc_from_o_vx_vy(self.p1, v0, v1)
+        return subtraction(self.w.result, box(c - vy((self.w.width / 2) + 0.01, c.cs),
+                                              distance(self.p2, self.p1),
+                                              self.w.width + 0.01,
+                                              self.height))
+    @around(my3DLayer)
     def generate(self):
-        return subtraction(self.w, box(self.pos1, self.pos2))
+        v0 = self.p2 - self.p1
+        v1 = rotated_v(v0, pi / 2)
+        c = loc_from_o_vx_vy(self.p1, v0, v1)
+        return subtraction(self.w.result, box(c - vy((self.w.width / 2) + 0.01, c.cs),
+                                                     distance(self.p2, self.p1),
+                                                     self.w.width + 0.01,
+                                                     self.height))
 
-    @around(my2Dlayer)
+    @around(my2DLayer)
     def generate(self):
         """nrho = pol_rho(self.pos1)/cos(abs(pol_phi(self.pos2) - pol_phi(self.pos1)))
         aux1 = pol(nrho, pol_phi(self.pos2))
         line(self.pos1, aux1)
         arc(self.pos1, distance(self.pos1, aux1), pol_phi(self.pos1), pol_phi(self.pos1) + pi/2)"""
-        empty_shape()
+        pass
 
 
     @around(myAnalysisLayer)
     def generate(self):
-        return subtraction(self.w, box(self.pos1, self.pos2))
+        v0 = self.p2 - self.p1
+        v1 = rotated_v(v0, pi / 2)
+        c = loc_from_o_vx_vy(self.p1, v0, v1)
+        p2 = c + vx(distance(self.p1, self.p2), c.cs)
+        p3 = p2 + vz(self.height)
+        p4 = p3 - vx(distance(self.p1, self.p2), c.cs)
+        return subtraction(self.w.result, surface_from(line(c, p2, p3, p4, c)))
 
 
 def test():
-    w1 = Wall(u0(), 10, 0.5, 3)
+    w1 = Wall(u0(), x(10), 0.5, 3)
     with activelayer(myAnalysisLayer):
-        d1 = Door(w1.generate(), xyz(4, -0.1, -0.1), xyz(5, 1.2, 2))
+        w1.generate()
+        d1 = Door(w1, x(2), x(4), 1.5)
         d1.generate()
+
 
 delete_all_shapes()
 test()
