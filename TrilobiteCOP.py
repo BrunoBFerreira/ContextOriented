@@ -6,7 +6,7 @@ my2DLayer = layer("2D")
 myAnalysisLayer = layer("analysis")
 
 def rotated_v(v, alpha):
-    return vpol(pol_rho(v), pol_phi(v) + alpha)
+    return vpol(pol_rho(v), pol_phi(v) + alpha, v.cs)
 
 class Wall:
     def __init__(self, p1, p2, width, height):
@@ -16,11 +16,12 @@ class Wall:
         self.height = height
         self.result = empty_shape()
 
+
     def generate(self):
         v0 = self.p2 - self.p1
-        v1 = rotated_v(v0, pi/2)
+        v1 = rotated_v(v0, pi / 2)
         c = loc_from_o_vx_vy(self.p1, v0, v1)
-        self.result = box(c-vy(self.width/2, c.cs), distance(self.p1, self.p2), self.width, self.height)
+        self.result = box(c - vy(self.width / 2, c.cs), distance(self.p1, self.p2), self.width, self.height)
         return self.result
 
     @around(my3DLayer)
@@ -115,8 +116,10 @@ class Door:
 
 
 def test():
-    w1 = Wall(u0(), x(10), 0.5, 3)
-    with activelayer(myAnalysisLayer):
+    w1 = Wall(y(10), u0(), 0.5, 3)
+    w2 = Wall(u0(), x(10), 1, 3)
+    with activelayer(my3DLayer):
+        w2.generate()
         w1.generate()
         d1 = Door(w1, x(2), x(4), 1.5)
         d1.generate()
