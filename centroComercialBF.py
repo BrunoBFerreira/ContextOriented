@@ -61,7 +61,7 @@ def polygonal_shops(ps, l, w):
     return polygonal_shapes(ps, l, w, line_shops)
 
 def single_sided_shops(ps, l, w):
-    polygonal_shops(offset_line(ps, w/2), l, w)
+    polygonal_shops(ps, l, w)
 
 def veli(a, b, phi):
     return vxy(a*cos(phi), b*sin(phi))
@@ -80,8 +80,8 @@ def single_sided_circular_shops(p, r, l, w, ex, ey):
         pass
 
 def double_sided_shops(ps, l, w):
-    polygonal_shops(offset_line(ps, w/2), l, w)
-    polygonal_shops(offset_line(list(reversed(ps)), w/2), l, w)
+    polygonal_shops(ps, l, w)
+    polygonal_shops(list(reversed(ps)), l, w)
 
 def double_sided_circular_shops(p, r, l, w, ex, ey):
     for fi in division(0, 2*pi, 4, False):

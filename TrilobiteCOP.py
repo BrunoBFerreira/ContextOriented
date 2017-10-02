@@ -125,5 +125,6 @@ def test():
         d1.generate()
 
 
-delete_all_shapes()
-test()
+#delete_all_shapes()
+#test()
+#surface_from(line(u0(), x(10), y(5), u0()))
