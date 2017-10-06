@@ -7,9 +7,10 @@ import time
 from math import *
 from functools import *
 import shutil
+import wincopy
 sys.path.append(path.dirname(sys.path[0]))
 from khepri.coords import *
-
+from khepri.primitives import *
 
 plugin = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                       'Khepri',
@@ -108,142 +109,8 @@ def remove_plugin():
 #db = doc.ModelSpace
 #util = doc.Utility
 
-conn = False
-id_counter = -1
-
-def current_connection():
-    global conn
-    global id_counter
-    if not conn:
-        check_plugin()
-        conn = create_connection()
-        id_counter = -1
-    return conn
-
-def create_connection():
-    for i in range(10):
-        try:
-            return socket.create_connection(("127.0.0.1", 11001))
-        except (ConnectionRefusedError, socket.timeout):
-            print('Please, start/restart Revit.')
-            time.sleep(4)
-            if i == 9:
-                raise
-
-#Python provides sendall but not recvall
-def recvall(sock, count):
-    buf = b''
-    while count:
-        newbuf = sock.recv(count)
-        if not newbuf: return None
-        buf += newbuf
-        count -= len(newbuf)
-    return buf
-
-def disconnect():
-    global conn
-    if conn:
-        conn.sendall(struct.pack('1B', OpCode.disconnect))
-        recvall(conn, 1)
-        conn.close()
-        conn = False
-
-class Packer(object):
-    def __init__(self, fmt):
-        self.struct = struct.Struct(fmt)
-    def write(self, conn, *args):
-        conn.sendall(self.struct.pack(*args))
-    def read(self, conn):
-        return self.struct.unpack(recvall(conn, self.struct.size))
-
-class _Void(Packer):
-    def __init__(self):
-        super().__init__('1B')
-    def read(self, conn):
-        return super().read(conn)[0] == 0
-    def write(self, conn, b):
-        raise RuntimeException('Void should not be serialized!')
-
-Void = _Void()
-
-
-class _Boolean(Packer):
-    def __init__(self):
-        super().__init__('1B')
-    def read(self, conn):
-        return super().read(conn)[0] == 1
-    def write(self, conn, b):
-        super().write(conn, 1 if b else 0)
-        
-Boolean = _Boolean()
-
-class _Double(Packer):
-    def __init__(self):
-        super().__init__('d')
-    def read(self, conn):
-        d = super().read(conn)[0]
-        if isnan(d):
-            raise RuntimeError(String.read(conn))
-        else:
-            return d
-
-Double = _Double()
-
-class _DoubleArray(object):
-    def write(self, conn, ds):
-        Int.write(conn, len(ds))
-        for d in ds:
-            Double.write(conn, d)
-    def read(self, conn):
-        n = Int.read(conn)
-        if n == -1:
-            raise RuntimeError(String.read(conn))
-        else:
-            ds = []
-            for i in range(n):
-                ds.append(Double.read(conn))
-            return ds    
-
-DoubleArray = _DoubleArray()
-
-
-
-class _Int(Packer):
-    def __init__(self):
-        super().__init__('i')
-    def read(self, conn):
-        return super().read(conn)[0]
-
-Int = _Int()
-
-class _String(object):
-    def write(self, conn, str):
-        size = len(str)
-        array = bytearray()
-        while True:
-            byte = size & 0x7f
-            size >>= 7
-            if size:
-                array.append(byte | 0x80)
-            else:
-                array.append(byte)
-                break
-        conn.send(array)
-        conn.sendall(str.encode('utf-8'))
-    def read(self, conn):
-        size = 0
-        shift = 0
-        byte = 0x80
-        while byte & 0x80:
-            try:
-                byte = ord(conn.recv(1))
-            except TypeError:
-                raise IOError('Buffer empty')
-            size |= (byte & 0x7f) << shift
-            shift += 7
-        return recvall(conn, size).decode('utf-8')
-
-String = _String()
+define_backend('Revit', 11001)
+check_plugin()
 
 class _XYZ(Packer):
     def __init__(self):
@@ -256,7 +123,6 @@ class _XYZ(Packer):
                    world_cs)
 
 XYZ = _XYZ()
-
 
 class _XYZArray(object):
     def write(self, conn, ps):
@@ -343,34 +209,6 @@ class _ElementIdArray(object):
 ElementIdArray = _ElementIdArray()
 ElementArray = _ElementIdArray()
 
-#debug_mode = False
-debug_mode = True
-
-def def_op(name, idx, arg_types, ret_type):
-    op_code = bytes((idx,))
-    def pack(*args):
-        assert len(args) == len(arg_types), "%r: %r does not match %r" % (name, args, tuple(type(t).__name__ for t in arg_types))
-        conn = current_connection()
-        conn.send(op_code);
-        if debug_mode:
-            print("{0}{1}".format(name, args), flush=True)
-        for arg_type, arg in zip(arg_types, args):
-            arg_type.write(conn, arg)
-        return ret_type.read(conn)
-    return pack
-
-def from_python_to_csharp(name):
-    return "".join([s.capitalize() for s in name.split('_')])
-
-def request_operation(name):
-    conn = current_connection()
-    conn.send(bytes((0,)))
-    String.write(conn, name)
-    op = Int.read(conn)
-    if op == -1:
-        raise NameError(name + ' is not available')
-    else:
-        return op
 
 def def_remote_operation(name, idx, arg_types, ret_type):
     #print(name, idx)
@@ -457,10 +295,8 @@ ops = [#(Void, 'SetDebugMode', Int),
        '''
 
 for ret_type, name, *arg_types in ops:
-    def_remote_operation(name,
-                         request_operation(name), #from_python_to_csharp(name)),
-                         arg_types,
-                         ret_type)
+    globals()[name] = def_op(name, request_operation(name), arg_types, ret_type)
+
 
 
 def set_fast_mode(mode):

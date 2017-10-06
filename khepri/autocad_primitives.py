@@ -2,6 +2,7 @@ import socket
 import struct
 import sys
 from os import path
+import os
 import time
 from math import *
 from functools import *
@@ -11,33 +12,34 @@ from khepri.coords import *
 from khepri.primitives import *
 
 bundle_name = 'Khepri.bundle'
-bundle_dll = os.path.join('Contents', 'KhepriAutoCAD.dll')
-bundle_xml = os.path.join('PackageContents.xml')
+bundle_dll = path.join('Contents', 'KhepriAutoCAD.dll')
+bundle_xml = path.join('PackageContents.xml')
 
 
-developer_plugin_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                                       'KhepriPlugins',
-                                       'KhepriAutoCAD',
-                                       'KhepriAutoCAD')
-developer_plugin_dll = os.path.join(developer_plugin_folder,
-                                    'bin',
-                                    'x64',
-                                    'Debug',
-                                    'KhepriAutoCAD.dll')
-developer_khepri_bundle = os.path.join(developer_plugin_folder, bundle_name)
+developer_plugin_folder = path.join(path.dirname(path.dirname(path.dirname(path.abspath(__file__)))),
+                                    'KhepriPlugins',
+                                    'KhepriAutoCAD',
+                                    'KhepriAutoCAD')
+developer_plugin_dll = path.join(developer_plugin_folder,
+                                 'bin',
+                                 'x64',
+                                 'Debug',
+                                 'KhepriAutoCAD.dll')
+developer_khepri_bundle = path.join(developer_plugin_folder, bundle_name)
 
 developer_mode = False
-#developer_mode = os.path.exists(developer_plugin_dll)
+#developer_mode = path.exists(developer_plugin_dll)
 
 #    Installation
-checked_plugin = True
-#checked_plugin = False
+# THIS MUST BE FALSE FOR "NORMAL" USERS
+#checked_plugin = True
+checked_plugin = False
 
 #One of the methods is to inject a load command in acad.lsp
-#acad_lsp = os.path.join(os.path.expanduser("~"), "acad.lsp")
+#acad_lsp = path.join(path.expanduser("~"), "acad.lsp")
 #def set_acad_lsp():
     #def contains_netload(path):
-        #if os.path.exists(path):
+        #if path.exists(path):
             #with open(path, "r") as f:
                 #if 'KhepriAutoCAD.dll' in f.read():
                     #return True
@@ -51,23 +53,23 @@ checked_plugin = True
 
 #The previous approach isn't working.
 #The next one is to put the bundle in AppData
-khepri_bundle = os.path.join(os.path.dirname(os.path.abspath(__file__)), bundle_name)
-khepri_bundle_dll = os.path.join(khepri_bundle, bundle_dll)
-khepri_bundle_xml = os.path.join(khepri_bundle, bundle_xml)
+khepri_bundle = path.join(path.dirname(path.abspath(__file__)), bundle_name)
+khepri_bundle_dll = path.join(khepri_bundle, bundle_dll)
+khepri_bundle_xml = path.join(khepri_bundle, bundle_xml)
 
 def plugin_folder():
     if os.name == 'nt':
-        return os.path.join(os.environ['APPDATA'], 'Autodesk', 'ApplicationPlugins')
+        return path.join(os.environ['APPDATA'], 'Autodesk', 'ApplicationPlugins')
     elif os.name == 'posix':
-        folder = os.path.join(os.environ['HOME'], 'Autodesk', 'ApplicationAddins')
+        folder = os.path.join(environ['HOME'], 'Autodesk', 'ApplicationAddins')
         os.makedirs(folder, exist_ok=True)
         return folder
     else:
         raise RuntimeError('Unknown operating system:' + os.name)
 
-target = os.path.join(plugin_folder(), bundle_name)
-target_dll = os.path.join(target, bundle_dll)
-target_xml = os.path.join(target, bundle_xml)
+target = path.join(plugin_folder(), bundle_name)
+target_dll = path.join(target, bundle_dll)
+target_xml = path.join(target, bundle_xml)
 
 def check_plugin(force=False):
     global checked_plugin
@@ -75,31 +77,31 @@ def check_plugin(force=False):
         if developer_mode:
             update_plugin()
         print('Checking plugin...', end="", flush=True)
-        if os.path.exists(target):
-            if os.path.exists(khepri_bundle_dll):
+        if path.exists(target):
+            if path.exists(khepri_bundle_dll):
                 print('updating plugin...', end="", flush=True)
                 try:
                     shutil.move(khepri_bundle_dll, target_dll)
                     shutil.move(khepri_bundle_xml, target_xml)
                 except PermissionError:
                     print('\n\nError! Please, close AutoCAD and retry.\n')
-                    raise
+                    #raise
         else:
             print('copying plugin...', end="", flush=True)
             try:
                 shutil.copytree(khepri_bundle, target)
             except PermissionError:
                 print('\n\nError! Please, close AutoCAD and retry.\n')
-                raise
+                #raise
             # remove dll to allow for updates
             os.remove(khepri_bundle_dll)
-            print('Please, restart AutoCAD')
+            print('Please, restart AutoCAD', flush=True)
         print('done', flush=True)
         checked_plugin = True
 
 def update_plugin(force=False):
-    if (force or (not os.path.exists(khepri_bundle_dll)) or
-        os.path.getmtime(developer_plugin_dll) > os.path.getmtime(khepri_bundle_dll)):
+    if (force or (not path.exists(khepri_bundle_dll)) or
+        path.getmtime(developer_plugin_dll) > path.getmtime(khepri_bundle_dll)):
         print('Updating from developer version')
         shutil.rmtree(khepri_bundle)
         shutil.copytree(developer_khepri_bundle, khepri_bundle)
