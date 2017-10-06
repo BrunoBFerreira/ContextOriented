@@ -22,7 +22,7 @@ def shop(p, v, l, w):
     w3.generate()
     w4 = Wall(c + vxy(l, w/2, c.cs), c + vy(w/2, c.cs), wall_thickness, wall_height)
     w4.generate()
-    d1 = Door(w3, c+vxy(wall_door_start*l, w/2, c.cs), c+vxy(wall_door_end*l, w/2, c.cs), door_height)
+    d1 = Door(w4, c+vxy(wall_door_start*l, w/2, c.cs), c+vxy(wall_door_end*l, w/2, c.cs), door_height)
     d1.generate()
 
 def line_shops(p0, p1, l, w):
