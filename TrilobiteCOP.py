@@ -9,7 +9,7 @@ def rotated_v(v, alpha):
     return vpol(pol_rho(v), pol_phi(v) + alpha, v.cs)
 
 class Wall:
-    def __init__(self, p1, p2, width, height):
+    def __init__(self, p1, p2, width = 0.5, height = 3):
         self.p1 = p1
         self.p2 = p2
         self.width = width
@@ -51,7 +51,7 @@ class Wall:
         return surface_from(line(c, p2, p3, p4, c))
 
 class Slab:
-    def __init__(self, path, thickness):
+    def __init__(self, path, thickness=0.2):
         self.path = path
         self.thickness = thickness
 
@@ -69,6 +69,39 @@ class Slab:
     @around(myAnalysisLayer)
     def generate(self):
         return surface_from(self.path)
+
+class Slab_With_Opening:
+    def __init__(self, path, openings, thickness=0.2):
+        self.path = path
+        self.thickness = thickness
+        self.openings = openings
+
+    def generate(self):
+        result = extrusion(surface_from(self.path), self.thickness)
+        for lns in self.openings:
+            result = subtraction(result,
+                                 extrusion(surface_from(line(lns)), 2*self.thickness))
+        return result
+
+    @around(my3DLayer)
+    def generate(self):
+        result = extrusion(surface_from(self.path), self.thickness)
+        for lns in self.openings:
+            result = subtraction(result,
+                                 extrusion(surface_from(line(lns)), 2 * self.thickness))
+        return result
+
+    @around(my2DLayer)
+    def generate(self):
+        return self.path
+
+    @around(myAnalysisLayer)
+    def generate(self):
+        result = surface_from(self.path)
+        for lns in self.openings:
+            result = subtraction(result,
+                                 surface_from(line(lns)))
+        return result
 
 class Door:
     def __init__(self, w, p1, p2, h):
@@ -124,7 +157,13 @@ def test():
         d1 = Door(w1, x(2), x(4), 1.5)
         d1.generate()
 
+def test2():
+    with activelayer(my3DLayer):
+        Slab_With_Opening(line(xyz(0, 0, 0), xyz(10, 0, 0), xyz(10, 10, 0), xyz(0, 10, 0), xyz(0, 0, 0)),
+                          [[xyz(2.5, 2.5, 0), xyz(7.5, 2.5, 0), xyz(7.5, 7.5, 0), xyz(2.5, 7.5, 0), xyz(2.5, 2.5, 0)],
+                           [xyz(7.5, 2.5, 0), xyz(8.2, 2.5, 0), xyz(8.2, 5, 0), xyz(7.5, 5, 0), xyz(7.5, 2.5, 0)]]).generate()
+
 
 #delete_all_shapes()
-#test()
+#test2()
 #surface_from(line(u0(), x(10), y(5), u0()))
