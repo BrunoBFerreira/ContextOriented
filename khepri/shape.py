@@ -193,7 +193,7 @@ def is_universal_ref(r):
 ###################
 class native_ref(object):
     def __init__(self, ref):
-        assert not isinstance(ref, (_empty_ref, _universal_ref, native_ref, multiple_ref)), "Not an acceptable ref {0} in {1}".format(r, self)
+        assert not isinstance(ref, (_empty_ref, _universal_ref, native_ref, multiple_ref)), "Not an acceptable ref {0} in {1}".format(ref, self)
         self._ref = ref
 
     def do(self, f):
@@ -223,16 +223,16 @@ class native_ref(object):
         return r1.intersect_1_1_with_native(r0, s)
         
     def intersect_1_1_with_native(r1, r0, s):
-        return s.intersect_ref(r0._ref, r1._ref)
+        return native_ref(s.intersect_ref(r0._ref, r1._ref))
         
     def subtract_1_1(r0, r1, s):
         return r1.subtract_1_1_with_native(r0, s)
 
     def subtract_1_1_with_native(r1, r0, s):
-        return s.subtract_ref(r0._ref, r1._ref)
+        return native_ref(s.subtract_ref(r0._ref, r1._ref))
 
     def slice(r, p, n, s):
-        return s.slice_ref(r._ref, p, n)
+        return native_ref(s.slice_ref(r._ref, p, n))
 
 
 class multiple_ref(object):
@@ -409,6 +409,28 @@ def native_ref_or_union(rs):
     else:
         return union_ref(rs)
 
+
+
+import sys
+    
+def trace_calls_and_returns(frame, event, arg):
+        co = frame.f_code
+        func_name = co.co_name
+        if func_name == 'write':
+            # Ignore write() calls from print statements
+            return
+        line_no = frame.f_lineno
+        filename = co.co_filename
+        if event == 'call':
+            print('Call to %s on line %s of %s' % (func_name, line_no, filename))
+            return trace_calls_and_returns
+        elif event == 'return':
+            print('%s => %s' % (func_name, arg))
+        return
+    
+#sys.settrace(trace_calls_and_returns)
+
+
 ###################
 class _empty_shape(object):
     def realize(self):
@@ -454,12 +476,12 @@ def partition(seq, condition):
     return a, b
 
 def maybe_delete_shapes(shapes, ref):
-   for s in shapes:
-       if is_empty_shape(s) or is_universal_shape(s):
-           pass
-       elif ref.contains(s.realize()):
-           s.delete()
-   return ref
+    for s in shapes:
+        if is_empty_shape(s) or is_universal_shape(s):
+            pass
+        elif not ref.contains(s.realize()):
+            s.delete()
+    return ref
 
 
 # For testing purposes

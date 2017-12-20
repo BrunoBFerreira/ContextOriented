@@ -384,7 +384,7 @@ def subtraction(*shapes):
             return s.realize()
         elif is_empty_shape(s) or any(is_universal_shape(o) or (o is s)
                                       for o in ss):
-            return empty_ref()
+            return maybe_delete_shapes(ss, empty_ref())
         else:
             r = s.realize()
             rs = [s0.realize() for s0 in ss]
@@ -477,6 +477,8 @@ def loft_surfaces(profiles, rails, is_ruled=False, is_closed=False):
 
 @shape_constructor(shape)
 def lofted(profiles, rails=[], is_ruled=False, is_closed=False):
+    profiles = list(profiles)
+    rails = list(rails)
     if all(map(is_curve, profiles)):
         return loft_curves(profiles, rails, is_ruled, is_closed)
     elif all(map(is_surface, profiles)):
@@ -500,6 +502,8 @@ def lofted(profiles, rails=[], is_ruled=False, is_closed=False):
         raise RuntimeError("{0}: cross sections are neither points nor curves nor surfaces  {1}".format('loft_shapes', profiles))
 
 def loft(profiles, rails=[], is_ruled=False, is_closed=False):
+    profiles = list(profiles)
+    rails = list(profiles)
     if len(profiles) == 1:
         raise RuntimeError(quote(loft), 'just one cross section')
     elif all(map(is_point, profiles)):
@@ -618,7 +622,7 @@ def bounding_box(shapes = []):
     return tuple(BoundingBox(shapes))
 
 def all_shapes():
-    return AllShapes()
+    return GetAllShapes()
 
 
 ### Special commands
@@ -706,7 +710,7 @@ def prompt_real(str="Real?"):
 def create_layer(name, color=False):
     layer = CreateLayer(name)
     if color:
-        SetLayerColor(layer, rgb_red(color), rgb_green(color), rgb_blue(color))
+        SetLayerColor(layer, color.red, color.green, color.blue)
     return layer
 
 def _current_layer(name=None):

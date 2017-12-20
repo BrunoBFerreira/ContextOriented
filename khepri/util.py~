@@ -30,7 +30,7 @@ def division_generator(a, b, n, include_last=True):
         yield b
 
 def division(a, b, n, include_last=True):
-    return list(division_generator(a, b, n, include_last))
+    return list(division_generator(a, b, n, include_last=True))
 
 def map_division(f, a, b, n, include_last=True, *rest):
     if len(rest) == 0:

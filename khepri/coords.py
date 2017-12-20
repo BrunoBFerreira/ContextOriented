@@ -1,4 +1,5 @@
 #from khepri.coords import *
+from __future__ import division
 from math import *
 from itertools import *
 from khepri.matrix44 import *
@@ -480,7 +481,7 @@ def vec_in_world(p):
 
 def unitize(v):
   d = sqrt(v.x**2 + v.y**2 + v.z**2)
-  return vxyz(v.x/d, v.y/d, v.z/d, v.cs)
+  return vxyz(v.x/d, v.y/d, v.z/d, v.cs) 
 
 def distance(p, q):
   v = p - q

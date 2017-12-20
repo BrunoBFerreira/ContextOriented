@@ -348,13 +348,13 @@ def surface_from(*curves):
                 id = singleton(ids)
             else:
                 id = rh.AddPatch(refs, 3, 3)
-    elif len(refs) < 5:
+    elif len(refs) < 0: #Temporary fix for Funda's problem# 5:
         id = rh.AddEdgeSrf(refs)
     else:
         id = rh.AddPlanarSrf(refs)
     delete_shapes(cs)
     return id
-        
+
 @shape_constructor(solid)
 def box(corner=u0(), dx=1, dy=None, dz=None):
     dy = dy or dx
@@ -540,7 +540,7 @@ def subtraction(*shapes):
             return s.realize()
         elif is_empty_shape(s) or any(is_universal_shape(o) or (o is s)
                                       for o in ss):
-            return empty_ref()
+            return maybe_delete_shapes(ss, empty_ref())
         else:
             r = s.realize()
             rs = [s0.realize() for s0 in ss]
@@ -821,7 +821,7 @@ def surface_grid(ptss, closed_u=False, closed_v=False):
         nv = len(ptss[0])
         return rh.AddSrfPtGrid((nu, nv),
                                ps,
-                               (2*int(nu/10)+1, 2*int(nv/10)+1),
+                               (max(2*int(nu/10)+1,2), max(2*int(nv/10)+1,2)),
                                (closed_u, closed_v))
 
 @shape_constructor(solid)
@@ -933,9 +933,29 @@ def prompt_shape(str="Select shape"):
     else:
         return empty_shape()
 
+def get_shape_named(name):
+    return shape_from_ref(rh.ObjectsByName(name, False, False, False)[0])
+
 def bounding_box(s):
     return [fromPt(p) for p in rh.BoundingBox([s.refs()])]
 
+def rhino_rgb_from_rgb(c):
+    return ((c.red << 0) +
+            (c.green << 8) +
+            (c.blue << 16))
+
+def rgb_from_rhino_rgb(rc):
+    return rgb(rh.ColorRedValue(rc),
+               rh.ColorGreenValue(rc),
+               rh.ColorBlueValue(rc))
+
+def shape_color(sh, color=None):
+    if color:
+        color = rhino_rgb_from_rgb(color)
+        sh.realize().do(lambda r: rh.ObjectColor(r, color))
+        return sh
+    else:
+        return rh.ObjectColor(sh.ref())
 
 # layers
 create_layer = rh.AddLayer
@@ -952,7 +972,11 @@ class current_layer(object):
     def __exit__(self, type, value, traceback):
         rh.CurrentLayer(self.previous_layer)
 
-
+def shape_layer(shape, layer=None):
+    if layer:
+        shape.realize().do(lambda r: rh.ObjectLayer(r, layer))
+    else:
+        return rh.ObjectLayer(shape.realize()._ref)
 
 def shape_from_ref(r):
     with parameter(immediate_mode, False):
@@ -1028,3 +1052,249 @@ def view_with_background(camera, target, lens):
 generate_mode(True)
 step_mode(False)
 immediate_mode(True)
+
+
+def brep_subbreps(object_id):
+    brep = _brep_from_id(object_id)
+    ids = []
+    for face in brep.Faces:
+        newbrep = face.DuplicateFace(True)
+        id = scriptcontext.doc.Objects.AddBrep(newbrep)
+        ids.append(id)
+    return ids
+
+def shape_surfaces(shape):
+    ref = shape.realize()
+    return ref.map(lambda r: map(shape_from_ref, brep_subbreps(r)))
+
+def shape_edges(shape):
+    ref = shape.realize()
+    return ref.map(lambda r: map(shape_from_ref, rh.DuplicateEdgeCurves(r)))
+
+def shape_vertices(shape):
+    pts = []
+    for edge in shape_edges(shape):
+        r = edge.ref()
+        pt = rh.CurveStartPoint(r)
+        if pt not in pts:
+            pts.append(pt)
+        pt = rh.CurveEndPoint(r)
+        if pt not in pts:
+            pts.append(pt)
+    return map(fromPt, pts)
+
+def show_vertices(shape):
+    map(lambda p: sphere(p, 0.05), shape_vertices(shape))
+
+#delete_all_shapes()
+#show_vertices(sphere())
+
+
+# BIM stuff
+
+def load_beam_family(path, *args):
+    return False
+
+def load_column_family(path, *args):
+    return False
+
+def level(h):
+    return h
+
+def level_height(h):
+    return h
+
+current_level = make_parameter(level(0))
+default_level_to_level_height = make_parameter(3)
+
+def upper_level(lvl=None, height=None):
+    lvl = lvl or current_level();
+    height = height or default_level_to_level_height()
+    return level(level_height(lvl) + height)
+
+
+
+import collections
+def Record(typename, **fields_dict):
+    T = collections.namedtuple(typename, ' '.join(fields_dict.keys()))
+    T.__new__.__defaults__ = tuple(fields_dict.values())
+    return T
+
+Beam_Family = Record('Beam_Family', path='', map={}, layer=False, width=0.1, height=0.1, profile=False, material=False)
+default_beam_family = make_parameter(Beam_Family())
+
+Column_Family = Record('Column_Family', path='', map={}, layer=False, width=0.1, depth=False, is_section_circular=False)
+default_column_family = make_parameter(Column_Family())
+
+Slab_Family = Record('Slab_Family', path='', map={}, layer=False, thickness=0.3, coating_thickness=0)
+default_slab_family = make_parameter(Slab_Family())
+
+Roof_Family = Record('Roof_Family', path='', map={}, layer=False, thickness=0.3, coating_thickness=0)
+default_roof_family = make_parameter(Roof_Family())
+
+Wall_Family = Record('Wall_Family', path='', map={}, layer=False, thickness=0.3)
+default_wall_family = make_parameter(Wall_Family())
+
+Panel_Family = Record('Panel_Family', path='', map={}, layer=False, thickness=0.01, material='Glass')
+default_panel_family = make_parameter(Panel_Family())
+
+def is_vertical(p0, p1):
+    return (p0-p1).cyl_rho < 1e-10
+
+create_bim_layers = make_parameter(True)
+
+def bim_shape_layer(shape, layer = None):
+    if layer:
+        if create_bim_layers():
+            return shape_layer(shape, layer)
+    else:
+        return shape_layer(shape)
+
+def shape_reference(s):
+    return s.realize()._ref
+
+@shape_constructor(solid)
+def beam(p0, p1, angle=0, family=None):
+    family = family or default_beam_family()
+    h, w = family.height, family.width
+    if is_vertical(p0, p1):
+        s = right_cuboid(p0, w, h, p1, angle)
+    else:
+        cb, dz = base_and_height(p0, p1)
+        s = right_cuboid(loc_in_world(cb + vy(-(h/2))),
+                         family.width,
+                         h,
+                         loc_in_world(cb + vyz(-(h/2), dz)),
+                         angle)
+    bim_shape_layer(s, family.layer)
+    return shape_reference(s)
+    
+@shape_constructor(solid)
+def column(center, bottom_level=None, top_level=None, family=None):
+    bottom_level = bottom_level or current_level()
+    top_level = top_level or upper_level(bottom_level)
+    family = family or default_column_family()
+    width = family.width
+    s = box(center + vxyz(-(width/2), -(width/2), level_height(bottom_level)),
+            width,
+            width,
+            level_height(top_level) - level_height(bottom_level))
+    bim_shape_layer(s, family.layer)
+    return shape_reference(s)
+
+@shape_constructor(solid)
+def slab(vertices, level=None, family=None):
+    level = level or current_level()
+    family = family or default_slab_family()
+    if is_list(vertices) and is_loc(vertices[0]):
+        v = vz(level_height(level) - 
+               family.thickness +
+               family.coating_thickness)
+        s = irregular_prism(map(lambda p: p + v, vertices),
+                            family.thickness)
+        bim_shape_layer(s, family.layer)
+        return shape_reference(s)
+    else:
+        path = vertices if is_list(vertices) else [vertices]
+        def loop(p):
+            if p == []:
+                return []
+            else:
+                e = p[0]
+                if not len(p) == 1:
+                    raise RuntimeError('Unfinished')
+                if is_line(e):
+                    raise RuntimeError('Unfinished')
+                elif is_polygon(e):
+                    vertices = polygon_vertices(e)
+                    v = vz(level_height(level) -
+                           family.thickness +
+                           family.coating_thickness)
+                    s = irregular_prism(map(lambda p: p + v, vertices),
+                                        family.thickness)
+                    bim_shape_layer(s, family.layer)
+                    return shape_reference(s)
+                elif is_arc(e):
+                    raise RuntimeError('Unfinished')
+                elif is_circle(e):
+                    s = extrusion(surface_circle(circle_center(e) +
+                                                 vz(-circle_center(e).z) +
+                                                 vz(level_height(level)),
+                                                 circle_radius(e)),
+                                  vz(family.coating_thickness - family.thickness))
+                    bim_shape_layer(s, family.layer)
+                    return shape_reference(s)
+                else:
+                    raise RuntimeError('Unknown path component', e)
+        return loop(path)
+
+@shape_constructor(solid)
+def slab_opening(slab_id, path):
+    layer = bim_shape_layer(slab_id)
+    s = subtraction(slab_id, slab(path, slab_level(slab_id), slab_family(slab_id)))
+    bim_shape_layer(s, layer)
+    return shape_reference(s)
+
+@shape_constructor(solid)
+def roof(vertices, level=None, family=None):
+    level = level or current_level()
+    family = family or default_roof_family()
+    v = vz(level_height(level) - family.thickness + family.coating_thickness)
+    s = irregular_prism(map(lambda p: p + v, vertices), family.thickness)
+    bim_shape_layer(s, family.layer)
+    return shape_reference(s)
+
+@shape_constructor(solid)
+def wall(p0, p1, bottom_level=None, top_level=None, family=None):
+    bottom_level = bottom_level or current_level()
+    top_level = top_level or upper_level(bottom_level)
+    family = family or default_wall_family()
+    base_height = level_height(bottom_level)
+    h = level_height(top_level) - base_height
+    z = base_height + h/2
+    s = right_cuboid(p0 + vz(z), family.thickness, h, p1 + vz(z))
+    bim_shape_layer(s, family.layer)
+    return shape_reference(s)
+  
+@shape_constructor(solid)
+def walls(vertices, bottom_level=None, top_level=None, family=None):
+    bottom_level = bottom_level or current_level()
+    top_level = top_level or upper_level(bottom_level)
+    family = family or default_wall_family()
+    v = vz(level_height(bottom_level))
+    s = thicken(extrusion(line(map(lambda p: p + v, vertices)),
+                          level_height(top_level) - level_height(bottom_level)),
+                family.thickness)
+    bim_shape_layer(s, family.layer)
+    return shape_reference(s)
+
+@shape_constructor(solid)
+def door(wall, loc, family=None):
+    family = family or default_door_family()
+    wall_e = walls_family(wall).thickness
+    wall_level = walls_bottom_level(wall)
+    return shape_reference(
+        subtraction(wall, box(loc + vz(level_height(wall_level)),
+                              family.width,
+                              wall_e, family.height)))
+
+@shape_constructor(solid)
+def panel(vertices, level=None, family=None):
+    level = level or current_level()
+    family = family or default_panel_family()
+    p0, p1, p2 = vertices[1], vertices[0], vertices[2]
+    n = vz(family.thickness/2, cs_from_o_vx_vy(p0, p1 - p0, p2 - p0))
+    s = irregular_prism(map(lambda v: loc_in_world(v - n), vertices), vec_in_world(n*2))
+    bim_shape_layer(s, family.layer)
+    return shape_reference(s)
+
+
+def slab_rectangle(p, len, width, level=None, family=None):
+    level = level or current_level()
+    family = family or default_slab_family()
+    return slab([p, p + vx(len), p + vxy(len, width), p + vy(width)], level, family)
+  
+def roof_rectangle(p, len, width, level=None, family=None):
+    level = level or current_level()
+    family = family or default_roof_family()
+    return roof([p, p + vx(len), p + vxy(len, width), p + vy(width)], level, family)
