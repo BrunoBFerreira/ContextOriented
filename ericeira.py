@@ -390,32 +390,53 @@ def wall_f0_w3():
 
 def house():
     delete_all_shapes()
-    #piso0
-    Slab(line(pts_laje_0)).generate()
-    #pts da laje + nivel da laje (definido anteriormente)
-    parede(0.12, pts_walls_floor0, True, False)
-    #xpto(pts_walls_floor0, True, False)
-    parede(0, pts_winds_floor0, True, False)
-    #windows f0
-    parede(0, pts_inside_walls_floor0, True, False)
-    #piso1
-    #current_level(upper_level())
-    Slab(line([pt + vz(3) for pt in pts_laje_1])).generate()
-    parede(0.12, [pt + vz(3) for pt in pts_walls_floor1], True, False)
-    #problema do nivel!!!
-    parede(0.12, [pt + vz(3) for pt in pts_outter_walls_floor1], True, False)
-    #problema do nivel!!!
-    parede(0, [pt + vz(3) for pt in pts_inside_walls_floor1], True, False)
-    parede(0, [pt + vz(3) for pt in pts_winds_floor1], True, False)
-    #windows f1
-    #roof
-    #current_level(upper_level())
-    #sobe de nivel de acordo com o default
-    Slab_With_Opening(line([pt + vz(6) for pt in pts_teto]),
-                      [[pt + vz(6) for pt in pts_cl_1],
-                      [pt + vz(6) for pt in pts_cl_2],
-                      [pt + vz(6) for pt in pts_cl_3]]).generate()
-    #Slab(line([pt + vz(6) for pt in pts_teto])).generate()
+    al = activelayer(myAnalysisLayer)
+    with al:
+        if al._getActiveLayers().__contains__(myAnalysisLayer):
+            # piso1
+            # current_level(upper_level())
+            Slab(line([pt + vz(3) for pt in pts_laje_1])).generate()
+            parede(0.12, [pt + vz(3) for pt in pts_walls_floor1], True, False)
+            # problema do nivel!!!
+            parede(0.12, [pt + vz(3) for pt in pts_outter_walls_floor1], True, False)
+            # problema do nivel!!!
+            parede(0, [pt + vz(3) for pt in pts_inside_walls_floor1], True, False)
+            parede(0, [pt + vz(3) for pt in pts_winds_floor1], True, False)
+            # windows f1
+            # roof
+            # current_level(upper_level())
+            # sobe de nivel de acordo com o default
+            Slab_With_Opening(line([pt + vz(6) for pt in pts_teto]),
+                              [[pt + vz(6) for pt in pts_cl_1],
+                               [pt + vz(6) for pt in pts_cl_2],
+                               [pt + vz(6) for pt in pts_cl_3]]).generate()
+        else:
+            #piso0
+            Slab(line(pts_laje_0)).generate()
+            #pts da laje + nivel da laje (definido anteriormente)
+            parede(0.12, pts_walls_floor0, True, False)
+            #xpto(pts_walls_floor0, True, False)
+            parede(0, pts_winds_floor0, True, False)
+            #windows f0
+            parede(0, pts_inside_walls_floor0, True, False)
+            #piso1
+            #current_level(upper_level())
+            Slab(line([pt + vz(3) for pt in pts_laje_1])).generate()
+            parede(0.12, [pt + vz(3) for pt in pts_walls_floor1], True, False)
+            #problema do nivel!!!
+            parede(0.12, [pt + vz(3) for pt in pts_outter_walls_floor1], True, False)
+            #problema do nivel!!!
+            parede(0, [pt + vz(3) for pt in pts_inside_walls_floor1], True, False)
+            parede(0, [pt + vz(3) for pt in pts_winds_floor1], True, False)
+            #windows f1
+            #roof
+            #current_level(upper_level())
+            #sobe de nivel de acordo com o default
+            Slab_With_Opening(line([pt + vz(6) for pt in pts_teto]),
+                              [[pt + vz(6) for pt in pts_cl_1],
+                              [pt + vz(6) for pt in pts_cl_2],
+                              [pt + vz(6) for pt in pts_cl_3]]).generate()
+            #Slab(line([pt + vz(6) for pt in pts_teto])).generate()
 '''
 for pts, ang in zip([wall_f0_w1(), wall_f0_w2(), wall_f0_w3(), wall_f0_s1(), wall_f0_s2(), wall_f1_w1(), wall_f1_w2(), wall_f1_w3(), wall_f1_w4(), wall_f1_s0(), wall_f1_s1(), wall_f1_s2()], [pi/2, pi/2, pi/2, 0, 0, pi/2, pi/2, pi/2, pi/2, 0, 0, 0]):
     union(itera_quads_chess(stripe, multi_stripes, pts),

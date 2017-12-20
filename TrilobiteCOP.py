@@ -158,10 +158,14 @@ def test():
         d1.generate()
 
 def test2():
-    with activelayer(my3DLayer):
-        Slab_With_Opening(line(xyz(0, 0, 0), xyz(10, 0, 0), xyz(10, 10, 0), xyz(0, 10, 0), xyz(0, 0, 0)),
-                          [[xyz(2.5, 2.5, 0), xyz(7.5, 2.5, 0), xyz(7.5, 7.5, 0), xyz(2.5, 7.5, 0), xyz(2.5, 2.5, 0)],
-                           [xyz(7.5, 2.5, 0), xyz(8.2, 2.5, 0), xyz(8.2, 5, 0), xyz(7.5, 5, 0), xyz(7.5, 2.5, 0)]]).generate()
+    al = activelayer(my3DLayer)
+    with al:
+        if not(al._getActiveLayers().__contains__(my2DLayer)):
+            Slab_With_Opening(line(xyz(0, 0, 0), xyz(10, 0, 0), xyz(10, 10, 0), xyz(0, 10, 0), xyz(0, 0, 0)),
+                              [[xyz(2.5, 2.5, 0), xyz(7.5, 2.5, 0), xyz(7.5, 7.5, 0), xyz(2.5, 7.5, 0), xyz(2.5, 2.5, 0)],
+                               [xyz(7.5, 2.5, 0), xyz(8.2, 2.5, 0), xyz(8.2, 5, 0), xyz(7.5, 5, 0), xyz(7.5, 2.5, 0)]]).generate()
+        else:
+            pass
 
 
 #delete_all_shapes()
