@@ -1,6 +1,10 @@
 #lang racket
 
 (require rnrs/mutable-pairs-6)
+(provide define-layer
+         define-layered
+         deflayered
+         with-layers)
 #|
 ContextScheme v0.1
 Copyright (c) 2009 Pascal Costanza
