@@ -31,8 +31,9 @@
          (n (floor (/ d l))))
     (if (equal? (exact-ceiling n) 0)
         (list)
-        (for/list ([r (division 0 (exact-ceiling d) (exact-ceiling n) #f)])
-          (shop (p+v p0 (v*r v r)) v l w)))))
+        (let ((l (/ d n)))
+          (for/list ([r (division 0 (exact-ceiling d) (exact-ceiling n) #f)])
+            (shop (p+v p0 (v*r v r)) v l w))))))
 
 (define (polygonal-shapes ps l w shape)
   (if (eq? (length ps) 2)
@@ -57,7 +58,7 @@
 (define (offset-line ps d)
   (let* ((vs (for/list ([p0 (reverse (cdr (reverse ps)))]
                         [p1 (cdr ps)])
-               (rotated-v (unitize (v*r (p-p p1 p0) d)) pi/2)))
+               (rotated-v (v*r (unitize (p-p p1 p0)) d) pi/2)))
          (vss (append (cons (car vs)
                           (for/list ([v0 (reverse (cdr (reverse vs)))]
                                      [v1 (cdr vs)])
@@ -90,8 +91,8 @@
 
 (define (single-sided-circular-shops p r l w ex ey)
   (for/list ([fi (division 0 (* 2 pi) 4 #f)])
-    (single-sided-shops (l-points (p+v p (veli (/ ex (* 2 (sqrt 2)))
-                                               (/ ey (* 2 (sqrt 2)))
+    (single-sided-shops (l-points (p+v p (veli (* (/ ex 2) (sqrt 2))
+                                               (* (/ ey 2) (sqrt 2))
                                                (+ fi pi/4)))
                                   (- r (/ ex 2))
                                   (- r (/ ey 2))
@@ -101,8 +102,8 @@
 
 (define (double-sided-circular-shops p r l w ex ey)
   (for/list ([fi (division 0 (* 2 pi) 4 #f)])
-    (double-sided-shops (l-points (p+v p (veli (/ ex (* 2 (sqrt 2)))
-                                               (/ ey (* 2 (sqrt 2)))
+    (double-sided-shops (l-points (p+v p (veli (* (/ ex 2) (sqrt 2))
+                                               (* (/ ey 2) (sqrt 2))
                                                (+ fi pi/4)))
                                   (- r (/ ex 2))
                                   (- r (/ ey 2))
@@ -132,9 +133,9 @@
 
 (define (colombo-atrio p r l a ex ey n)
   (let* ((e (max ex ey))
-         (w (/ (- r (- a(* (- n 1) e))) (- (* 2 n) 1))))
-    (colombo p r l w ex ey w)))
+         (w (/ (- r a (* (- n 1) e)) (- (* 2 n) 1))))
+    (colombo p r l w ex ey n)))
 
-(with-layers (3D)
-  #;(colombo-atrio (xy 0 0) 100000 12000 25000 7000 7000 4)
-  (shop (xyz 0 0 0 ) (vx 1) 10 10))
+(with-layers (2D)
+ (colombo-atrio (xy 0 0) 100000 12000 25000 7000 7000 4))
+  #;(shop (xyz 0 0 0 ) (vx 1) 10 10)

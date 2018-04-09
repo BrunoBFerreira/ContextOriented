@@ -111,6 +111,11 @@ def colombo_atrio(p, r, l, a, ex, ey, n):
     w = (r - a - (n - 1)*e)/(2*n - 1)
     colombo(p, r, l, w, ex, ey, n)
 
-with activelayer(my3DLayer):
-    colombo_atrio(xy(0,0), 100000, 12000, 25000, 7000, 7000, 4)
+with activelayer(my2DLayer):
+    #colombo_atrio(xy(0,0), 100000, 12000, 25000, 7000, 7000, 4)
+    #shop(xyz(0, 0, 0), vx(1), 10, 10)
+    #single_sided_circular_shops(xy(0,0), 1000, 100, 200, 10, 20)
+    pts = [xy(0,0), xy(100, 0), xy(100, 100)]
+    line(pts)
+    line(offset_line(pts, 10))
 

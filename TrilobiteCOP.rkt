@@ -4,7 +4,7 @@
 (require "contextRacket.rkt")
 
 (provide (all-defined-out))
-(provide with-layers)
+(provide with-layers deflayered define-layered define-layer)
 
 (define-layer 3D)
 (define-layer 2D)
@@ -16,6 +16,7 @@
 (define-layered wall)
 (define-layered slab)
 (define-layered door)
+(define-layered slab-with-opening)
 
 (deflayered (wall 3D)
   (lambda (p1 p2 width height)
@@ -30,9 +31,8 @@
     (let* ((v0 (p-p p2 p1))
            (v1 (rotated-v v0 pi/2))
            (c (loc-from-o-vx-vy p1 v0 v1)))
-      (rectangle (p+v c (vy (/ width 2) c)) (distance p1 p2) width))))
+      (rectangle (p+v c (vy (/ width -2) c)) (distance p1 p2) width))))
 
-;;Verificar com prof porque nao funciona!!!1
 (deflayered (wall analysis)
   (lambda (p1 p2 width height)
     (let* ((v0 (p-p p2 p1))
@@ -76,6 +76,32 @@
            (p4 (p+v p3 (vz h)))
            (p5 (p+v p4 (vx (- (distance p1 p2)) c))))
       (subtraction w (surface (line c p3 p4 p5 c))))))
+
+(deflayered (slab-with-opening 3D)
+  (lambda (path openings thickness)
+    (define (openings-recursive list-op res)
+      (if (null? list-op)
+          res
+          (begin
+          (openings-recursive (cdr list-op)
+                              (subtraction res (extrusion (surface (closed-line (car list-op))) (+ thickness 1)))))))
+    (let ((res (extrusion (surface path) thickness)))
+      (openings-recursive openings res))))
+      
+
+(deflayered (slab-with-opening 2D)
+  (lambda (path openings thickness)
+    path))
+
+(deflayered (slab-with-opening analysis)
+  (lambda (path openings thickness)
+    (define (openings-recursive list-op res)
+      (if (null? list-op)
+          res
+          (openings-recursive (cdr list-op) (subtraction res (surface (closed-line (car list-op)))))))
+    (let ((res (surface path)))
+      (openings-recursive openings res))))
+
 
 
 #|
