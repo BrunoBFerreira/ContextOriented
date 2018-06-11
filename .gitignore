@@ -175,3 +175,5 @@ TAGS
 
 # coredumps
 *.core
+
+*.xml
