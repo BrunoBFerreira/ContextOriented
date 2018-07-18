@@ -1,5 +1,5 @@
 from khepri.autocad import *
-from TrilobiteCOP import *
+from TrilobiteCOPtest import *
 
 ##PROBLEMAS A RESOLVER
 #1 riscado das paredes opacas sempre para fora

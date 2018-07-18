@@ -1,4 +1,4 @@
-from TrilobiteCOP import *
+from TrilobiteCOPtest import *
 from sys import *
 
 delete_all_shapes()
