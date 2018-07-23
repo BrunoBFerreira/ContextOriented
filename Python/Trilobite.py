@@ -77,6 +77,13 @@ def rotated_v(v, alpha):
     return vpol(pol_rho(v), pol_phi(v) + alpha, v.cs)
 
 
+def form_closed_shape(bounds):
+    for s1, s2 in zip(bounds, bounds[1:] + [bounds[0]]):
+        if not s1.intersect(s2):
+            return False
+    return True
+
+
 class Level:
     def __init__(self, elevation, name="Level"):
         self.elevation = elevation
@@ -97,7 +104,9 @@ class Level:
 
 class Space:
     def __init__(self, bounds, bottom_level=None, top_level=None, interior=True, name="Space"):
-        assert len(bounds) >= 4
+        assert len(bounds) > 2
+        if not form_closed_shape(bounds):
+            raise ValueError("Bounds do not form a closed shape")
         self.bounds = bounds
         if name == "Space":
             global space_index
@@ -118,9 +127,75 @@ class Space:
         add_space(self, self.name)
         self.elements = set()
 
-    def add_element(self, element):
+    def is_inside(self, p, host):
+        return host in self.elements
+
+    def is_inside(self, p):
+        f = xy(+inf, p.y)
+        new_bound = Bound(p, f)
+        count=0
+        for b in self.bounds:
+            if b.intersect(new_bound):
+                if b.orientation(p) == 0:
+                    return b.on_bound(p)
+                count += 1
+        return count % 2 == 1
+
+    def add_element(self, element, pts, host=None):
         if element not in self.elements:
+            for p in pts:
+                if host is not None:
+                    if not self.is_inside(p, host):
+                        raise ValueError("Element is not inside the desired space")
+                else:
+                    if not self.is_inside(p):
+                        raise ValueError("Element is not inside the desired space")
             self.elements.add(element)
+
+
+class Bound:
+    def __init__(self, p1, p2, element=None):
+        self.p1 = p1
+        self.p2 = p2
+        self.element = element  # it will be used to associate a wall with a bound, for example
+
+    def is_right(self, p):
+        value = copysign(1, (self.p2.x - self.p1.x)*(p.y - self.p1.y) - (self.p2.y - self.p1.y)*(p.x - self.p1.x))
+        return value >= 0
+
+    def orientation(self, p):
+        val = (p.y - self.p1.y)*(self.p2.x - p.x) - (p.x - self.p1.x)*(self.p2.y - p.y)
+        if val == 0:
+            return 0
+        else:
+            return 1 if val > 0 else 2
+
+    def on_bound(self, p):
+        return max(self.p1.x, self.p2.x) >= p.x >= min(self.p1.x, self.p2.x) and max(self.p1.y, self.p2.y) >= p.y >= min(
+            self.p1.y, self.p2.y)
+
+    def intersect(self, b):
+        o1 = self.orientation(b.p1)
+        o2 = self.orientation(b.p2)
+        o3 = b.orientation(self.p1)
+        o4 = b.orientation(self.p2)
+
+        if o1 != o2 and o3 != o4:
+            return True
+
+        if o1 == 0 and self.on_bound(b.p1):
+            return True
+
+        if o2 == 0 and self.on_bound(b.p2):
+            return True
+
+        if o3 == 0 and b.on_bound(self.p1):
+            return True
+
+        if o4 == 0 and b.on_bound(self.p2):
+            return True
+
+        return False
 
 
 class Wall:
@@ -136,7 +211,7 @@ class Wall:
                 lvl.add_element(self)
         if spaces:
             for spc in spcs:
-                spc.add_element(self)
+                spc.add_element(self, [p1, p2])
 
     def generate(self):
         if self.result is None:
@@ -188,7 +263,7 @@ class Slab:
                 lvl.add_element(self)
         if spaces:
             for spc in spcs:
-                spc.add_element(self)
+                spc.add_element(self, path)
 
     def generate(self):
         if self.result is None:
@@ -225,7 +300,7 @@ class SlabWithOpening:
                 lvl.add_element(self)
         if spaces:
             for spc in spcs:
-                spc.add_element(self)
+                spc.add_element(self, path)
 
     def generate(self):
         if self.result is None:
@@ -275,7 +350,7 @@ class Door:
                 lvl.add_element(self)
         if spaces:
             for spc in spcs:
-                spc.add_element(self)
+                spc.add_element(self, [p1, p2], w)
 
     def generate(self):
         if self.result is None:
@@ -288,7 +363,7 @@ class Door:
                                                            distance(self.p2, self.p1),
                                                            self.w.width + 0.01,
                                                            self.height))
-            self.result = self.w.result # It is the same now. Update when the doors have an actual shape to be added
+            self.result = self.w.result  # It is the same now. Update when the doors have an actual shape to be added
         return self.result
 
     @around(layer_3d)
