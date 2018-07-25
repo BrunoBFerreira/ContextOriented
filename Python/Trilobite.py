@@ -48,6 +48,25 @@ def set_current_space(space):
     current_space = space
 
 
+def space_from_walls(ws, name="Space"):
+    assert len(ws) > 2
+    same_level = True
+    for w1, w2 in zip(ws, ws[1:]):
+        if not w1.bottom_level == w2.bottom_level:
+            same_level = False
+            break
+    if same_level:
+        bounds = [Bound(w.p1, w.p2, w)
+              for w in ws]
+        sp = Space(bounds, ws[0].bottom_level, name=name)
+        sp.add_walls(ws)
+        for w in ws:
+            w.add_space(sp)
+        return sp
+    else:
+        raise ValueError("Walls for bounds must be at the same level.")
+
+
 def add_geometry(element):
     if element not in geometry:
         geometry.add(element)
@@ -141,16 +160,28 @@ class Space:
                 count += 1
         return count % 2 == 1
 
+    def is_between(self, elevation):
+        return self.top_level.elevation >= elevation >= self.lower_level.elevation
+
     def add_element(self, element, pts, host=None):
+        flag = False
         if element not in self.elements:
-            for p in pts:
-                if host is not None:
-                    if not self.is_inside(p, host):
-                        raise ValueError("Element is not inside the desired space")
-                else:
-                    if not self.is_inside(p):
-                        raise ValueError("Element is not inside the desired space")
-            self.elements.add(element)
+            if host is not None:
+                if not self.is_inside(u0(), host):
+                    raise ValueError("Element is not inside the desired space")
+            else:
+                for p in pts:
+                    if self.is_inside(p):
+                        flag = True
+                        break
+            if flag and self.is_between(element.elevation):
+                self.elements.add(element)
+            else:
+                raise ValueError("Element is not inside the desired space")
+
+    def add_walls(self, ws):
+        for w in ws:
+            self.elements.add(w)
 
 
 class Bound:
@@ -197,21 +228,47 @@ class Bound:
 
         return False
 
+    def slope(self):
+        return (self.p2.y - self.p1.y) / (self.p2.x - self.p1.x)
+
+    def add_wall(self, w):
+        test_bound = Bound(w.p1, w.p2)
+        if self.intersect(test_bound) and self.slope() == test_bound.slope():
+            self.element = w
+        else:
+            raise ValueError("Element does not belong to the specified bound")
+
 
 class Wall:
-    def __init__(self, p1, p2, width=0.5, height=3, lvls=[], spcs=[]):
+    def __init__(self, p1, p2, width=0.5, bottom_level=None, top_level=None, height=0, spcs=[]):
         self.p1 = p1
         self.p2 = p2
         self.width = width
-        self.height = height
         self.result = None
         add_geometry(self)
-        if lvls:
-            for lvl in lvls:
-                lvl.add_element(self)
-        if spaces:
-            for spc in spcs:
+        if bottom_level is None:
+            global current_level
+            self.bottom_level = current_level
+        else:
+            self.bottom_level = bottom_level
+        if top_level is None:
+            self.top_level = upper_level(self.bottom_level)
+        else:
+            self.top_level = top_level
+        if height == 0:
+            self.height = self.top_level.elevation - self.bottom_level.elevation
+        else:
+            self.height = height
+        self.elevation = self.bottom_level.elevation
+        self.top_level.add_element(self)
+        self.bottom_level.add_element(self)
+        self.spcs = spcs
+        if self.spcs:
+            for spc in self.spcs:
                 spc.add_element(self, [p1, p2])
+
+    def add_space(self, sp):
+        self.spcs.append(sp)
 
     def generate(self):
         if self.result is None:
@@ -259,11 +316,17 @@ class Slab:
         self.result = None
         add_geometry(self)
         if lvls:
+            self.lvls = lvls
             for lvl in lvls:
                 lvl.add_element(self)
-        if spaces:
-            for spc in spcs:
-                spc.add_element(self, path)
+        else:
+            self.lvls = [current_level]
+            current_level.add_element(self)
+        self.elevation = self.lvls[0].elevation
+        self.spcs = spcs
+        if self.spcs:
+            for spc in self.spcs:
+                spc.add_element(self, self.path)
 
     def generate(self):
         if self.result is None:
@@ -296,11 +359,17 @@ class SlabWithOpening:
         self.openings = openings
         self.result = None
         if lvls:
+            self.lvls = lvls
             for lvl in lvls:
                 lvl.add_element(self)
-        if spaces:
-            for spc in spcs:
-                spc.add_element(self, path)
+        else:
+            self.lvls = [current_level]
+            current_level.add_element(self)
+        self.elevation = self.lvls[0].elevation
+        self.spcs = spcs
+        if self.spcs:
+            for spc in self.spcs:
+                spc.add_element(self, self.path)
 
     def generate(self):
         if self.result is None:
@@ -346,10 +415,16 @@ class Door:
         self.w = w
         self.result = None
         if lvls:
+            self.lvls = lvls
             for lvl in lvls:
                 lvl.add_element(self)
-        if spaces:
-            for spc in spcs:
+        else:
+            self.lvls = [current_level]
+            current_level.add_element(self)
+        self.elevation = self.lvls[0].elevation
+        self.spcs = spcs
+        if self.spcs:
+            for spc in self.spcs:
                 spc.add_element(self, [p1, p2], w)
 
     def generate(self):
